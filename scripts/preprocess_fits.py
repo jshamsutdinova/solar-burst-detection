@@ -91,7 +91,7 @@ if __name__ == "__main__":
         df_meta.to_csv(csv_path, index=False)
 
     dirs = [dir for dir in base_dir.iterdir() if dir.is_dir()]
-    idx_file = 0
+    idx_file = 1
     for dir in dirs:
         files = list(dir.glob("*.fits"))
         print(f"Processing directory: {dir}, found {len(files)} fits files")
