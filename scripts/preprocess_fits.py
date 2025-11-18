@@ -36,14 +36,25 @@ def generate_name(num_file, prefix, file_extension):
     filename = f"{prefix}{number}{file_extension}"
     return filename
 
-def add_metadata(file, output_csv):
-    """ Write metadata of files into a CSV file."""
-    pass
+def read_MUSER_fits(fits_path):
+    """ Read MUSER FITS files. Check problem with headers."""
+    try:
+        with fits.open(fits_path, verify='fix') as hdul:
+            header = hdul[0].header
+            data = hdul[0].data            
+            return header, data
+
+    except fits.VerifyError as e:
+        print(f"Problem with header: {e}")
+        with fits.open(fits_path, verify='fix') as hdul:
+            header = hdul[0].header
+            data = hdul[0].data
+            return header, data
 
 def prepare_dataset(fits_path):
-    with fits.open(fits_path) as hdul:
-        data = hdul[0].data
-    print(hdul[0].header)
+    """ Save two and three channel data and return metadata record."""
+    header, data = read_MUSER_fits(fits_path)
+
     h_spec = adaptive_normalization(data[:384, :])
     v_spec = adaptive_normalization(data[384:, :])
     
@@ -52,9 +63,19 @@ def prepare_dataset(fits_path):
     
     fname_two_ch = generate_name(idx_file, prefix='', file_extension='.npy')
     fname_three_ch = generate_name(idx_file, prefix='3ch_', file_extension='.png')
-
+    
+    new_record = {
+        'filename': fname_two_ch,
+        'has_burst': False,
+        'date': header['DATE'],
+        'start_t': str(fits_path.stem.split('_')[3]),
+        'fits': fits_path.name
+    }
+    
     np.save(f"data/temp/two_channel/{fname_two_ch}", two_channel_data)
     save_as_png(f"data/temp/three_channel/{fname_three_ch}", three_channel_data)
+    
+    return new_record
     
 
 if __name__ == "__main__":
@@ -65,20 +86,25 @@ if __name__ == "__main__":
         df_meta = pd.read_csv(csv_path)
         print('here')
     else:
-        columns = ['filename', 'has_burst', 'date', 'start_t' 'fits']
+        columns = ['filename', 'has_burst', 'date', 'start_t', 'fits']
         df_meta = pd.DataFrame(columns=columns)
+        df_meta.to_csv(csv_path, index=False)
 
     dirs = [dir for dir in base_dir.iterdir() if dir.is_dir()]
     idx_file = 0
-    for dir in dirs[:1]:
+    for dir in dirs:
         files = list(dir.glob("*.fits"))
         print(f"Processing directory: {dir}, found {len(files)} fits files")
 
-        for fits_file in files[:1]:
+        for fits_file in files:
             if fits_file.stem in df_meta['fits'].values:
                 print(f"File {fits_file} already processed, skipping.")
             else:
-                prepare_dataset(fits_file)
+                new_record = prepare_dataset(fits_file)
+                
+                new_df = pd.DataFrame([new_record])
+                df_meta = pd.concat([df_meta, new_df], ignore_index=True)
+                df_meta.to_csv(csv_path, index=False)
                                      
             idx_file += 1
             print(f"Proccesed {fits_file}, total files: {idx_file}")
