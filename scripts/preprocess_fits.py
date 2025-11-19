@@ -30,10 +30,10 @@ def save_as_png(save_path, data):
     img_data = cv2.applyColorMap(img_data, cv2.COLORMAP_JET)
     cv2.imwrite(save_path, img_data)
     
-def generate_name(num_file, prefix, file_extension):
+def generate_name(num_file, file_extension):
     """ Generate a file name using a pattern with leading zeros. """
     number = str(num_file).zfill(6)
-    filename = f"{prefix}{number}{file_extension}"
+    filename = f"{number}{file_extension}"
     return filename
 
 def read_MUSER_fits(fits_path):
@@ -51,7 +51,7 @@ def read_MUSER_fits(fits_path):
             data = hdul[0].data
             return header, data
 
-def prepare_dataset(fits_path):
+def prepare_dataset(fits_path, num_file):
     """ Save two and three channel data and return metadata record."""
     header, data = read_MUSER_fits(fits_path)
 
@@ -61,8 +61,8 @@ def prepare_dataset(fits_path):
     two_channel_data = np.stack([h_spec, v_spec], axis=-1) # for training    
     three_channel_data = prepare_for_labeling(two_channel_data) # for labeling
     
-    fname_two_ch = generate_name(idx_file, prefix='', file_extension='.npy')
-    fname_three_ch = generate_name(idx_file, prefix='3ch_', file_extension='.png')
+    fname_two_ch = generate_name(num_file, file_extension='.npy')
+    fname_three_ch = generate_name(num_file, file_extension='.png')
     
     new_record = {
         'filename': fname_two_ch,
@@ -91,7 +91,7 @@ if __name__ == "__main__":
         df_meta.to_csv(csv_path, index=False)
 
     dirs = [dir for dir in base_dir.iterdir() if dir.is_dir()]
-    idx_file = 1
+    num_file = 1
     for dir in dirs:
         files = list(dir.glob("*.fits"))
         print(f"Processing directory: {dir}, found {len(files)} fits files")
@@ -100,12 +100,12 @@ if __name__ == "__main__":
             if fits_file.stem in df_meta['fits'].values:
                 print(f"File {fits_file} already processed, skipping.")
             else:
-                new_record = prepare_dataset(fits_file)
+                new_record = prepare_dataset(fits_file, num_file)
                 
                 new_df = pd.DataFrame([new_record])
                 df_meta = pd.concat([df_meta, new_df], ignore_index=True)
                 df_meta.to_csv(csv_path, index=False)
                                      
-            idx_file += 1
-            print(f"Proccesed {fits_file}, total files: {idx_file}")
+            num_file += 1
+            print(f"Proccesed {fits_file}, total files: {num_file}")
             
