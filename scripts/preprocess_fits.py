@@ -14,15 +14,20 @@ def adaptive_normalization(data):
     
     return norm_data
 
-def prepare_for_labeling(two_channel_data):
-    """ Convert two-channel data to three-channel for convinient labeling."""
-    h_channel = two_channel_data[:, :, 0]
-    v_channel = two_channel_data[:, :, 1]
+def get_three_channel_data(combined_pols):
+    """ Convert combined polarizations as two-channel data to three-channel for convinient labeling."""
+    h_channel = combined_pols[:, :, 0]
+    v_channel = combined_pols[:, :, 1]
     third_channel = (h_channel + v_channel) / 2
     
     three_channel_data = np.stack([h_channel, v_channel, third_channel], axis=-1)
     
     return three_channel_data
+
+def get_two_channel_data(combined_pols):
+    """ Convert combined polarizations to two-channel data for training."""
+    two_channel_data = np.mean(combined_pols, axis=-1)
+    return two_channel_data 
 
 def save_as_png(save_path, data):
     """ Save the data as a PNG image. """
@@ -58,8 +63,9 @@ def prepare_dataset(fits_path, num_file):
     h_spec = adaptive_normalization(data[:384, :])
     v_spec = adaptive_normalization(data[384:, :])
     
-    two_channel_data = np.stack([h_spec, v_spec], axis=-1) # for training    
-    three_channel_data = prepare_for_labeling(two_channel_data) # for labeling
+    combined_pols = np.stack([h_spec, v_spec], axis=-1)     
+    two_channel_data = get_two_channel_data(combined_pols) #  for training
+    three_channel_data = get_three_channel_data(combined_pols) #  for labeling
     
     fname_two_ch = generate_name(num_file, file_extension='.npy')
     fname_three_ch = generate_name(num_file, file_extension='.png')
@@ -84,7 +90,6 @@ if __name__ == "__main__":
     
     if csv_path.is_file():
         df_meta = pd.read_csv(csv_path)
-        print('here')
     else:
         columns = ['filename', 'has_burst', 'date', 'start_t', 'fits']
         df_meta = pd.DataFrame(columns=columns)
