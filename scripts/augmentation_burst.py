@@ -75,22 +75,47 @@ def generate_background(height=384, width=3000):
             
     return np.clip(background, 0, 1)
 
-def generate_burst(background):
+def generate_burst(background, min_duration=150, max_duration=400):
     """ Generate a synthetic burst and overly it on the background."""
     height, width = background.shape
+    bboxes = []
     
-    # Parameters of type III bursts
-    burst_duration = np.random.randint(80, 250)
-    burst_freq_band = np.random.randint(25, 90)
+    # Parameters of type III bursts.
+    burst_duration = np.random.randint(min_duration, max_duration)
+    burst_freq_band = np.random.randint(30, 100)
     start_time = np.random.randint(150, width - burst_duration - 150)
-    start_freq = np.random.randint(60, height - burst_freq_band - 60)
+    start_freq = np.random.randint(80, height - burst_freq_band - 80)
     
-    # Parameters of the drift (burst slop)
-    drift_rate = np.random.uniform(-0.3, 0.3)
+    # Parameters of the drift (burst slop).
+    drift_rate = np.random.uniform(-0.4, 0.4)
+    drift_variation = np.random.uniform(0.05, 0.15)  # Change drift over time.
+    
+    # Parameters of curvature.
+    curvature = np.random.uniform(-0.2, 0.2)
+    wiggle_frequency = np.random.uniform(0.01, 0.05)  # дрожание
+    wiggle_amplitude = np.random.uniform(0.5, 2.0)
+    
+    # Intensity changes.
+    base_intensity = np.random.uniform(0.3, 0.7)
+    intensity_variation = np.random.uniform(0.1, 0.3)
+    
+    min_freq = height
+    max_freq = 0
     
     for t in range(burst_duration):
+        drif = curvature * (t / burst_duration - 0.5) ** 2
+        wiggle = wiggle_amplitude * np.sin(wiggle_frequency *t)
+        current_drift = drift_rate + drift_variation * (t / burst_duration) +\
+                        drif + wiggle
+                
         current_freq_offset = int(drift_rate * t)
         current_start_freq = start_freq + current_freq_offset
+        
+        if current_start_freq < min_freq:
+            min_freq = current_start_freq
+        if current_start_freq + burst_freq_band > max_freq:
+            max_freq = current_start_freq + burst_freq_band
+        
         
         if current_start_freq < 0 or current_start_freq >= height:
             continue
@@ -102,11 +127,17 @@ def generate_burst(background):
                 # Intensity gradient
                 time_factor = 1.0 - abs(t - burst_duration / 2) / (burst_duration / 2)
                 freq_factor = 1.0 - abs(t - burst_freq_band / 2) / (burst_freq_band / 2)
-                intensity = time_factor * freq_factor * np.random.uniform(0.4, 0.7)
+                
+                random_variation = 1.0 + intensity_variation * (np.random.random() - 0.5)
+                intensity = time_factor * freq_factor * base_intensity * random_variation
+                
+                if np.random.random() > 0.3:
+                    background[freq_pos, time_pos] = min(background[freq_pos, time_pos] + intensity, 1.0)
                 
                 # Add a burst
-                background[freq_pos, time_pos] = min(background[freq_pos, time_pos] + intensity, 1.0)
-                
+                # background[freq_pos, time_pos] = min(background[freq_pos, time_pos] + intensity, 1.0)
+        
+        #  Save to bboxes!!!       
     return background
 
 def plot_spec(images):    
